@@ -115,7 +115,13 @@
                     <button type="button"
                             disabled="@(paginaAtual <= 1)"
                             @onclick="PaginaAnteriorAsync">← Anterior</button>
-                    <span>Página @paginaAtual@(totalPaginas.HasValue ? $" de {totalPaginas}" : "")</span>
+                    <span>
+                        Página @paginaAtual
+                        @if (totalPaginas.HasValue)
+                        {
+                            <span>de @totalPaginas.Value</span>
+                        }
+                    </span>
                     <button type="button"
                             disabled="@(!TemProximaPagina)"
                             @onclick="ProximaPaginaAsync">Próxima →</button>
