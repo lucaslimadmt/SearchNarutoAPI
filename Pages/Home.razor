@@ -1,0 +1,230 @@
+@page "/"
+@inject NarutoApiService Api
+
+<PageTitle>SearchNarutoAPI | Personagens</PageTitle>
+
+<div class="site-container">
+    <header class="topbar">
+        <a class="brand" href="/" aria-label="Página inicial">
+            <span class="brand-mark" aria-hidden="true">忍</span>
+            <span>Search<span class="brand-accent">Naruto</span>API</span>
+        </a>
+        <span class="topbar-tag">Blazor WebAssembly • .NET 10</span>
+    </header>
+
+    <main>
+        <section class="hero" aria-labelledby="hero-title">
+            <div class="hero-copy">
+                <span class="eyebrow">UNIVERSO NARUTO</span>
+                <h1 id="hero-title">Explore o mundo <em>ninja.</em></h1>
+                <p>Busque personagens e conheça seus clãs, patentes e jutsus usando os dados da API Dattebayo.</p>
+
+                <form class="search-form" @onsubmit="BuscarAsync" @onsubmit:preventDefault="true">
+                    <label class="sr-only" for="nome-personagem">Nome do personagem</label>
+                    <input id="nome-personagem"
+                           type="search"
+                           placeholder="Ex.: Naruto Uzumaki"
+                           autocomplete="off"
+                           @bind="termoBusca"
+                           @bind:event="oninput" />
+                    <button type="submit" disabled="@carregando">Buscar</button>
+                </form>
+
+                <div class="suggestions" aria-label="Sugestões de busca">
+                    <span>Experimente:</span>
+                    <button type="button" @onclick='() => BuscarRapidaAsync("Naruto")'>Naruto</button>
+                    <button type="button" @onclick='() => BuscarRapidaAsync("Sasuke")'>Sasuke</button>
+                    <button type="button" @onclick='() => BuscarRapidaAsync("Sakura")'>Sakura</button>
+                </div>
+            </div>
+
+            <div class="hero-symbol" aria-hidden="true">
+                <div class="hero-circle"><span>忍</span></div>
+            </div>
+        </section>
+
+        <section class="results" aria-labelledby="results-title">
+            <div class="section-title-row">
+                <div>
+                    <span class="section-kicker">BANCO DE PERSONAGENS</span>
+                    <h2 id="results-title">
+                        @(string.IsNullOrWhiteSpace(buscaAplicada) ? "Todos os personagens" : "Resultados da busca")
+                    </h2>
+                    @if (!string.IsNullOrWhiteSpace(buscaAplicada))
+                    {
+                        <p class="search-description">Mostrando resultados para <strong>@buscaAplicada</strong>.</p>
+                    }
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(buscaAplicada))
+                {
+                    <button class="clear-button" type="button" @onclick="LimparBuscaAsync">
+                        Limpar busca
+                    </button>
+                }
+            </div>
+
+            @if (carregando)
+            {
+                <div class="state-panel" role="status" aria-live="polite">
+                    <div class="spinner" aria-hidden="true"></div>
+                    <h3>Carregando personagens...</h3>
+                    <p>A primeira consulta pode demorar alguns segundos.</p>
+                </div>
+            }
+            else if (!string.IsNullOrWhiteSpace(erro))
+            {
+                <div class="state-panel" role="alert">
+                    <div class="state-icon" aria-hidden="true">!</div>
+                    <h3>Não foi possível carregar os personagens</h3>
+                    <p>@erro</p>
+                    <button class="secondary-button" type="button" @onclick="CarregarAsync">
+                        Tentar novamente
+                    </button>
+                </div>
+            }
+            else if (personagens.Count == 0)
+            {
+                <div class="state-panel">
+                    <div class="state-icon" aria-hidden="true">?</div>
+                    <h3>Nenhum personagem encontrado</h3>
+                    <p>Tente outro nome ou limpe o campo de busca.</p>
+                    <button class="secondary-button" type="button" @onclick="LimparBuscaAsync">
+                        Ver todos os personagens
+                    </button>
+                </div>
+            }
+            else
+            {
+                <div class="result-count" aria-live="polite">
+                    @personagens.Count personagem(ns) nesta página
+                    @if (totalPersonagens > 0)
+                    {
+                        <span> • @totalPersonagens resultado(s) no total</span>
+                    }
+                </div>
+
+                <div class="character-grid">
+                    @foreach (var personagem in personagens)
+                    {
+                        <CharacterCard @key="personagem.Id" Personagem="@personagem" />
+                    }
+                </div>
+
+                <nav class="pagination" aria-label="Paginação de personagens">
+                    <button type="button"
+                            disabled="@(paginaAtual <= 1)"
+                            @onclick="PaginaAnteriorAsync">← Anterior</button>
+                    <span>Página @paginaAtual@(totalPaginas.HasValue ? $" de {totalPaginas}" : "")</span>
+                    <button type="button"
+                            disabled="@(!TemProximaPagina)"
+                            @onclick="ProximaPaginaAsync">Próxima →</button>
+                </nav>
+            }
+        </section>
+    </main>
+
+    <footer>
+        <span>SearchNarutoAPI • Desenvolvimento Web</span>
+        <span>Dados: <a href="https://dattebayo-api.onrender.com" target="_blank" rel="noopener noreferrer">Dattebayo API</a></span>
+    </footer>
+</div>
+
+@code {
+    private const int ItensPorPagina = 12;
+
+    private List<NarutoCharacter> personagens = new();
+    private string termoBusca = string.Empty;
+    private string buscaAplicada = string.Empty;
+    private string? erro;
+    private int paginaAtual = 1;
+    private int totalPersonagens;
+    private int? totalPaginas;
+    private bool carregando = true;
+
+    private bool TemProximaPagina => totalPaginas.HasValue
+        ? paginaAtual < totalPaginas.Value
+        : personagens.Count == ItensPorPagina;
+
+    protected override async Task OnInitializedAsync() => await CarregarAsync();
+
+    private async Task BuscarAsync()
+    {
+        buscaAplicada = termoBusca.Trim();
+        paginaAtual = 1;
+        await CarregarAsync();
+    }
+
+    private async Task BuscarRapidaAsync(string nome)
+    {
+        termoBusca = nome;
+        await BuscarAsync();
+    }
+
+    private async Task LimparBuscaAsync()
+    {
+        termoBusca = string.Empty;
+        buscaAplicada = string.Empty;
+        paginaAtual = 1;
+        await CarregarAsync();
+    }
+
+    private async Task PaginaAnteriorAsync()
+    {
+        if (paginaAtual <= 1)
+            return;
+
+        paginaAtual--;
+        await CarregarAsync();
+    }
+
+    private async Task ProximaPaginaAsync()
+    {
+        if (!TemProximaPagina)
+            return;
+
+        paginaAtual++;
+        await CarregarAsync();
+    }
+
+    private async Task CarregarAsync()
+    {
+        carregando = true;
+        erro = null;
+        StateHasChanged();
+
+        try
+        {
+            var resposta = await Api.ListarPersonagensAsync(
+                paginaAtual, ItensPorPagina, buscaAplicada);
+
+            personagens = resposta.Characters ?? new List<NarutoCharacter>();
+            totalPersonagens = resposta.TotalCharacters;
+
+            totalPaginas = resposta.TotalPages > 0
+                ? resposta.TotalPages
+                : resposta.TotalCharacters > 0
+                    ? (int)Math.Ceiling((double)resposta.TotalCharacters / ItensPorPagina)
+                    : null;
+        }
+        catch (HttpRequestException)
+        {
+            personagens.Clear();
+            erro = "Não foi possível acessar a API. Verifique sua conexão e tente novamente.";
+        }
+        catch (TaskCanceledException)
+        {
+            personagens.Clear();
+            erro = "A solicitação demorou muito para responder. Tente novamente.";
+        }
+        catch (Exception)
+        {
+            personagens.Clear();
+            erro = "Ocorreu um problema ao consultar os dados. Tente novamente.";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}

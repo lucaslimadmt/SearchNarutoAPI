@@ -1,0 +1,79 @@
+<article class="character-card">
+    <div class="character-image">
+        @if (!imagemFalhou && !string.IsNullOrWhiteSpace(Personagem.ImageUrl))
+        {
+            <img src="@Personagem.ImageUrl"
+                 alt="Imagem do personagem @Personagem.Name"
+                 loading="lazy"
+                 @onerror="FalhaNaImagem" />
+        }
+        else
+        {
+            <div class="image-placeholder" role="img" aria-label="Imagem indisponível">
+                <span>忍</span>
+                <small>Imagem indisponível</small>
+            </div>
+        }
+
+        <span class="character-id">#@Personagem.Id</span>
+    </div>
+
+    <div class="character-content">
+        <h3>@Personagem.Name</h3>
+
+        <dl class="character-info">
+            <div>
+                <dt>Clã / Afiliação</dt>
+                <dd>@Personagem.ClanOuAfiliacao</dd>
+            </div>
+            <div>
+                <dt>Patente ninja</dt>
+                <dd>@Personagem.Patente</dd>
+            </div>
+        </dl>
+
+        <div class="jutsu-area">
+            <div class="jutsu-heading">
+                <strong>Jutsus</strong>
+                <span>@Personagem.JutsuCount cadastrados</span>
+            </div>
+
+            @if (Personagem.JutsuCount == 0)
+            {
+                <p class="no-jutsu">Nenhum jutsu informado pela API.</p>
+            }
+            else
+            {
+                <button class="jutsu-toggle"
+                        type="button"
+                        aria-expanded="@mostrarJutsus"
+                        @onclick="AlternarJutsus">
+                    @(mostrarJutsus ? "Ocultar jutsus" : "Ver lista de jutsus")
+                    <span aria-hidden="true">@(mostrarJutsus ? "−" : "+")</span>
+                </button>
+
+                @if (mostrarJutsus)
+                {
+                    <ul class="jutsu-list">
+                        @foreach (var jutsu in Personagem.Jutsu ?? new List<string>())
+                        {
+                            <li>@jutsu</li>
+                        }
+                    </ul>
+                }
+            }
+        </div>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired]
+    public NarutoCharacter Personagem { get; set; } = default!;
+
+    private bool mostrarJutsus;
+    private bool imagemFalhou;
+
+    private void AlternarJutsus() => mostrarJutsus = !mostrarJutsus;
+
+    private void FalhaNaImagem() => imagemFalhou = true;
+}
